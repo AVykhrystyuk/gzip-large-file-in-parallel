@@ -6,55 +6,45 @@ using System.Collections.Concurrent;
 
 namespace GZipTest
 {
-    public class ParallelExecutor
+    public static class ParallelExecution
     {
-        public ParallelExecutor(int numberOfWorkers)
+        public static void ForEach<T>(IEnumerable<T> items, Action<T> handler)
         {
-
+            ForEach(items, handler, DegreeOfParallelism.Default);
         }
 
-        public void Execute<T>(IEnumerable<T> items, Action<T> handler)
+        public static void ForEach<T>(IEnumerable<T> items, Action<T> handler, DegreeOfParallelism degreeOfParallelism)
         {
             using (var blockingCollection = new BlockingCollection<T>())
             {
                 var threads = Enumerable
-                    .Range(0, 7)
+                    .Range(0, degreeOfParallelism.Value)
                     .Select(index =>
                     {
-                        return new Thread(context =>
+                        return new Thread(() =>
                         {
                             while (!blockingCollection.IsAddingCompleted || blockingCollection.Count > 0)
                             {
-                                if (blockingCollection.TryTake(out var item)) 
+                                if (blockingCollection.TryTake(out var item))
                                 {
-                                   handler(item);
+                                    handler(item);
                                 }
 
                                 Thread.Sleep(0);
                             }
                         })
                         {
-                            Name = "Thread " + index,
+                            Name = $"{nameof(ParallelExecution)} [{index}]",
                         };
                     })
                     .ToList();
 
-                foreach (var thread in threads)
-                {
-                    thread.Start("hello");
-                }
+                threads.ForEach(t => t.Start());
 
-                foreach (var item in items)
-                {
-                    blockingCollection.Add(item);
-                }
-
+                blockingCollection.AddRange(items);
                 blockingCollection.CompleteAdding();
 
-                foreach (var thread in threads)
-                {
-                    thread.Join();
-                }
+                threads.ForEach(t => t.Join());
             }
         }
     }

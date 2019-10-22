@@ -11,63 +11,55 @@ namespace GZipTest
     {
         static void Main(string[] args)
         {
-            var numberOfWorkers = Math.Max(Environment.ProcessorCount - 1, 1);
+            var degreeOfParallelism = new DegreeOfParallelism(Environment.ProcessorCount - 1);
             Console.WriteLine($"The number of processors on this computer is {Environment.ProcessorCount}.");
-            Console.WriteLine($"The number of parallel workers is {numberOfWorkers}.");
-            
-            var parallelExecutor = new ParallelExecutor(numberOfWorkers);
+            Console.WriteLine($"The number of parallel workers is {degreeOfParallelism.Value}.");
 
-            // var sourceFilepath = "./TestFiles/bigfile";;
+            // var sourceFilepath = "./TestFiles/bigfile";
             // var chunkOfBytes = FileUtils.ReadBytes(sourceFilepath, NumberOfBytesIn.MEGABYTE);
-            
-            var values = Enumerable.Range(0, 10).Select(n => {
+
+            var workItems = Enumerable.Range(0, 10).Select(n =>
+            {
                 Thread.Sleep(100);
                 return n;
             });
 
-            
-            TestTpl(values);
+            TestTpl(workItems);
             Console.WriteLine();
-            TestCustom(values, parallelExecutor);
+            TestCustom(workItems, degreeOfParallelism);
         }
 
-        static void TestCustom<T>(IEnumerable<T> items, ParallelExecutor parallelExecutor) 
+        static void TestCustom<T>(IEnumerable<T> items, DegreeOfParallelism degreeOfParallelism)
         {
             Console.WriteLine("Start testing Custom");
 
             var sw = Stopwatch.StartNew();
-            
-            var countOfReads = 0;
-            parallelExecutor.Execute(items, item =>
-            { 
-                Console.WriteLine(Thread.CurrentThread.Name + ": takes item " + item);
-                Interlocked.Increment(ref countOfReads);
+
+            ParallelExecution.ForEach(items, item =>
+            {
+                Console.WriteLine($"{Thread.CurrentThread.Name} : takes item {item}");
                 Thread.Sleep(200);
-            });
+            }, degreeOfParallelism);
 
             sw.Stop();
             Console.WriteLine("End testing Custom");
-            Console.WriteLine($"Count of reads: {countOfReads}");
             Console.WriteLine($"ms: {sw.ElapsedMilliseconds}, ticks: {sw.ElapsedTicks}");
         }
 
-        static void TestTpl<T>(IEnumerable<T> items) 
+        static void TestTpl<T>(IEnumerable<T> items)
         {
             Console.WriteLine("Start testing Tpl");
 
             var sw = Stopwatch.StartNew();
-            
-            var countOfReads = 0;
+
             Parallel.ForEach(items, item =>
             {
-                Console.WriteLine(Thread.CurrentThread.ManagedThreadId + ": takes item " + item);
-                Interlocked.Increment(ref countOfReads);
+                Console.WriteLine($"Thread {Thread.CurrentThread.ManagedThreadId} : takes item {item}");
                 Thread.Sleep(200);
             });
 
             sw.Stop();
             Console.WriteLine("End testing Tpl");
-            Console.WriteLine($"Count of reads: {countOfReads}");
             Console.WriteLine($"ms: {sw.ElapsedMilliseconds}, ticks: {sw.ElapsedTicks}");
         }
     }
