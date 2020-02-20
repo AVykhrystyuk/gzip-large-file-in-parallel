@@ -1,7 +1,11 @@
-
+﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GZipTest", "GZipTest\GZipTest.csproj", "{16F461D6-CAA9-4731-8A63-8E28F7B56CE4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GZipTest.DataStructures", "GZipTest.DataStructures\GZipTest.DataStructures.csproj", "{A8863676-55F4-4109-8FFF-284C789D9800}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GZipTest.DataStructures.Tests", "GZipTest.DataStructures.Tests\GZipTest.DataStructures.Tests.csproj", "{C79710F5-11C0-4B7C-9DE8-3EB949B7D93E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -13,5 +17,13 @@ Global
 		{16F461D6-CAA9-4731-8A63-8E28F7B56CE4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{16F461D6-CAA9-4731-8A63-8E28F7B56CE4}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{16F461D6-CAA9-4731-8A63-8E28F7B56CE4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A8863676-55F4-4109-8FFF-284C789D9800}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A8863676-55F4-4109-8FFF-284C789D9800}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A8863676-55F4-4109-8FFF-284C789D9800}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A8863676-55F4-4109-8FFF-284C789D9800}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C79710F5-11C0-4B7C-9DE8-3EB949B7D93E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C79710F5-11C0-4B7C-9DE8-3EB949B7D93E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C79710F5-11C0-4B7C-9DE8-3EB949B7D93E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C79710F5-11C0-4B7C-9DE8-3EB949B7D93E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
