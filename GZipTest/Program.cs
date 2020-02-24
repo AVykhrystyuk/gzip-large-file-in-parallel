@@ -6,15 +6,15 @@ namespace GZipTest
     {
         public static int Main(string[] args)
         {
-            var services = new ServiceCollection()
-                .AddSingleton<IConsoleCommandArgumentsParser, ConsoleCommandArgumentsParser>()
-                .AddSingleton<IConsoleCommandArgumentsValidator, ConsoleCommandArgumentsValidator>()
-                .AddSingleton<ConsoleApplication>();
-
-            var serviceProvider = services.BuildServiceProvider();
-
-            using var application = serviceProvider.GetService<ConsoleApplication>();
+            using var application = BuildServiceProvider().GetService<ConsoleApplication>();
             return application.Run(args);
         }
+
+        private static ServiceProvider BuildServiceProvider() =>
+            new ServiceCollection()
+                .AddSingleton<IConsoleCommandArgumentsParser, ConsoleCommandArgumentsParser>()
+                .AddSingleton<IConsoleCommandArgumentsValidator, ConsoleCommandArgumentsValidator>()
+                .AddSingleton<ConsoleApplication>()
+                .BuildServiceProvider();
     }
 }
