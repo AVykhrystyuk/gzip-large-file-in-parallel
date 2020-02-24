@@ -14,7 +14,6 @@ namespace GZipTest
 
         static void Main(string[] args)
         {
-            // Console.CancelKeyPress += ConsoleCancelKeyPress;
             // new CollectionDemo().ApiTest();
 
             var degreeOfParallelism = new DegreeOfParallelism(3); //Environment.ProcessorCount - 2); // MainThread + QueueWorkerThread
@@ -24,32 +23,46 @@ namespace GZipTest
             // var sourceFilepath = "./TestFiles/bigfile";
             // var chunkOfBytes = FileUtils.ReadBytes(sourceFilepath, 16 * NumberOfBytesIn.MEGABYTE);
 
-            var items = Enumerable.Range(0, 30).Select((value, index) =>
+            using var cancellationTokenSource = new CancellationTokenSource();
+
+            void ConsoleCancelKeyPress(object sender, ConsoleCancelEventArgs args)
             {
-                // emulate reading from disk
-                Thread.Sleep(100);
-                return new IndexedValue<int>(value, index);
-            });
+                if (args.SpecialKey != ConsoleSpecialKey.ControlC)
+                {
+                    return;
+                }
 
+                Console.WriteLine("Cancelling...");
+                args.Cancel = true;
 
-            // Tests.TestTpl(items);
-            Console.WriteLine();
-            // Tests.TestCustom(items, degreeOfParallelism, null);
-
-
-            Run(items, degreeOfParallelism);
-        }
-
-        static void ConsoleCancelKeyPress(object sender, ConsoleCancelEventArgs args)
-        {
-            if (args.SpecialKey != ConsoleSpecialKey.ControlC)
-            {
-                return;
+                cancellationTokenSource.Cancel();
             }
+            Console.CancelKeyPress += ConsoleCancelKeyPress;
 
-            Console.WriteLine("Cancelling...");
-            // args.Cancel = true;
-            // zipper.Cancel();
+            var ranges =
+                Enumerable.Range(0, 30)
+            // Enumerable.Empty<int>()
+            //     .Union(Enumerable.Range(0, 2).OrderByDescending(i => i))
+            //     .Union(Enumerable.Range(2, 2))
+            //     .Union(Enumerable.Range(4, 26).OrderByDescending(i => i))
+                .ToList();
+
+            var items = ranges
+                .Select((value, index) =>
+                {
+                    // if (index == 10) cancellationTokenSource.Cancel();
+
+                    // emulate reading from disk
+                    Thread.Sleep(100);
+                    return new IndexedValue<int>(index: value, value: index);
+                });
+                // .OrderByDescending(i => i.Index);
+
+            // ParallelTests.TestCustom(items, degreeOfParallelism);
+            // Console.WriteLine();
+            // ParallelTests.TestTpl(items);
+
+            Run(items, degreeOfParallelism, cancellationTokenSource.Token);
         }
 
         static void Run<T>(IEnumerable<IndexedValue<T>> items, DegreeOfParallelism degreeOfParallelism, CancellationToken cancellationToken = default)
@@ -59,35 +72,56 @@ namespace GZipTest
 
             var enqueuingCompleted = false;
 
-            // var queueWorker = new Thread(() =>
-            // {
-            //     HandleOrderedQueue(orderedQueue, () => enqueuingCompleted, cancellationToken);
-            // });
-            // queueWorker.Start();
+            using var consumerLinkedCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            using var producersLinkedCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
+            var queueWorker = new Thread(() =>
+            {
+                try
+                {
+                    HandleOrderedQueue(orderedQueue, () => enqueuingCompleted, producersLinkedCancellationTokenSource.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    // ignore this one
+                }
+                catch (Exception)
+                {
+                    consumerLinkedCancellationTokenSource.Cancel();
+                }
+            });
+            queueWorker.Start();
 
             var encodingExceptions = ParallelExecution.ForEach(
                 items,
                 handleItem: item =>
                 {
-                    if (item.Index == 7) { throw new Exception("T_T"); }
+                    // if (item.Index == 27) { throw new Exception("!!!ParallelExecution!!!T_T"); }
                     Console.WriteLine($"{Thread.CurrentThread.Name}: starts working on item {item.Index}");
 
                     // emulate encoding work
-                    Thread.Sleep(300);
+                    Thread.Sleep(300); //  * (item.Index % 2 == 0 ? 4 : 1));
 
                     // Console.WriteLine($"{Thread.CurrentThread.Name}: ends working on item {item.Index}");
                     orderedQueue.Enqueue(item);
-                    //Semaphore.Release();
+                    Semaphore.Release();
                 },
                 degreeOfParallelism,
-                cancellationToken);
+                consumerLinkedCancellationTokenSource.Token);
 
             enqueuingCompleted = true;
 
             if (encodingExceptions.Count > 0)
             {
+                if (!encodingExceptions.OfType<OperationCanceledException>().Any())
+                {
+                    producersLinkedCancellationTokenSource.Cancel();
+                }
+
                 LogEncodingExceptions(encodingExceptions);
             }
+
+            queueWorker.Join();
         }
 
         static void LogEncodingExceptions(IReadOnlyCollection<Exception> exceptions)
@@ -103,56 +137,47 @@ namespace GZipTest
 
         static void HandleOrderedQueue<T>(IOrderedQueue<IndexedValue<T>> orderedQueue, Func<bool> enqueuingCompleted, CancellationToken cancellationToken = default)
         {
-            // bool IsRunning()
-            // {
-            //     var stoped = !cancellationToken.IsCancellationRequested;
-            //     return !cancellationToken.IsCancellationRequested
-            //         || !enqueuingCompleted()
-            //         && orderedQueue.Count > 0;
-            // };
-
-            // saving chunks to FS
-            var currentIndex = 0;
-            // var wait = new SpinWait();
-            while (!enqueuingCompleted() || orderedQueue.Count > 0)
+            bool IsRunning()
             {
-                var enqueuingCompleted_ = enqueuingCompleted();
-                // Semaphore.Wait(cancellationToken);
-                // if (!orderedQueue.TryPeek(out var pickedItem))
-                // {
-                //     // Console.WriteLine($"Could not peek item");
-                //     // wait.SpinOnce();
-                //     // Thread.Sleep(0);
-                //     Thread.Sleep(100);
-                //     continue;
-                // }
+                var queueCompleted = enqueuingCompleted() && orderedQueue.Count == 0;
+                return !queueCompleted;
+            };
 
-                // wait.Reset();
+            var lookingForIndex = 0;
+            while (IsRunning())
+            {
+                // if (lookingForIndex == 3) throw new Exception("!!!HandleOrderedQueue!!!");
 
-                // if (pickedItem.Index != currentIndex)
-                // {
-                //     Console.WriteLine($"Peeked item with wrong index {pickedItem.Index}");
-                //     continue;
-                // }
+                // wait for an item being added to the queue
+                Semaphore.Wait(cancellationToken);
 
-                if (!orderedQueue.TryDequeue(out var item))
+                while (orderedQueue.Count > 0)
                 {
-                    Thread.Sleep(100);
-                    //Console.WriteLine($"Could not dequeue already peeked item {pickedItem.Index}");
-                    continue;
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    if (!orderedQueue.TryPeek(out var pickedItem))
+                    {
+                        throw new InvalidOperationException("Could not peek an item");
+                    }
+
+                    if (pickedItem.Index != lookingForIndex)
+                    {
+                        Console.WriteLine($"                                                      [wrong-index] Peeked an item with index {pickedItem.Index}, but looking for an item with index {lookingForIndex}");
+                        break;
+                    }
+
+                    if (!orderedQueue.TryDequeue(out var item))
+                    {
+                        throw new InvalidOperationException($"Could not dequeue already peeked item {pickedItem.Index}");
+                    }
+
+                    Console.WriteLine($"           Writing to FS item {item.Index}");
+
+                    // emulate some work
+                    Thread.Sleep(300);
+
+                    lookingForIndex++;
                 }
-
-                // if (orderedQueue.TryPeek(out var pickedItem) &&
-                //    pickedItem.Index == currentIndex &&
-                //    orderedQueue.TryDequeue(out var item))
-                // {
-                //     Console.WriteLine($"Writing to FS item {item.Index}");
-                // }
-
-                Console.WriteLine($"           Writing to FS item {item.Index} enqueuingCompleted: {enqueuingCompleted_}");
-                currentIndex++;
-
-                // Thread.Sleep(100);
             }
         }
     }

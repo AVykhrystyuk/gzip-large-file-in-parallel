@@ -7,52 +7,19 @@ namespace GZipTest
 {
     public static class CollectionExtensions
     {
-        [Obsolete]
-        public static bool AddRange<T>(this BlockingCollection<T> collection, IEnumerable<T> items, CancellationToken cancellationToken = default)
+        public static bool AddRangeSafe<T>(this BlockingCollection<T> collection, IEnumerable<T> items, CancellationToken cancellationToken = default)
         {
             foreach (var item in items)
             {
-                if (cancellationToken.IsCancellationRequested || collection.IsAddingCompleted)
+                if (cancellationToken.IsCancellationRequested)
                 {
-                    return true;
+                    return false;
                 }
 
-                try
-                {
-                    collection.Add(item);
-                }
-                catch (InvalidOperationException)
-                {
-                    return true;
-                }
+                collection.Add(item);
             }
 
-            return false;
-        }
-
-        public static bool AddRange<T>(this BlockingCollection<T> collection, IEnumerable<T> items)
-        {
-            foreach (var item in items)
-            {
-                try
-                {
-                    collection.Add(item);
-                }
-                catch (InvalidOperationException)
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        public static void ForEach<T>(this IEnumerable<T> collection, Action<T> action)
-        {
-            foreach (var item in collection)
-            {
-                action(item);
-            }
+            return true;
         }
     }
 }

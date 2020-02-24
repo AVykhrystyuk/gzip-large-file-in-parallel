@@ -9,7 +9,7 @@ namespace GZipTest
     [Obsolete]
     public static class ParallelTests
     {
-        static void TestCustom<T>(IEnumerable<IndexedValue<T>> items, DegreeOfParallelism degreeOfParallelism)
+        public static void TestCustom<T>(IEnumerable<IndexedValue<T>> items, DegreeOfParallelism degreeOfParallelism)
         {
             Console.WriteLine("Start testing Custom");
 
@@ -26,7 +26,7 @@ namespace GZipTest
             Console.WriteLine($"ms: {sw.ElapsedMilliseconds}, ticks: {sw.ElapsedTicks}");
         }
 
-        static void TestTpl<T>(IEnumerable<IndexedValue<T>> items)
+        public static void TestTpl<T>(IEnumerable<IndexedValue<T>> items)
         {
             Console.WriteLine("Start testing Tpl");
 

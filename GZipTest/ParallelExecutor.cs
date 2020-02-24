@@ -15,9 +15,10 @@ namespace GZipTest
             CancellationToken cancellationToken = default)
         {
             var threadCount = (degreeOfParallelism ?? DegreeOfParallelism.Default).Value;
-            var iterationExceptions = new ConcurrentBag<Exception>();
+            var exceptions = new ConcurrentBag<Exception>();
 
-            using var blockingItems = new BlockingCollection<T>();
+            using var blockingItems = new BlockingCollection<T>(new ConcurrentQueue<T>());
+
             var threads = Enumerable
                 .Range(0, threadCount)
                 .Select(index => new Thread(() =>
@@ -25,7 +26,7 @@ namespace GZipTest
                     ForEachThreadLoop(
                         blockingItems,
                         handleItem,
-                        iterationExceptions,
+                        exceptions,
                         cancellationToken);
                 })
                 {
@@ -35,72 +36,17 @@ namespace GZipTest
 
             threads.ForEach(t => t.Start());
 
-            blockingItems.AddRange(items);
+            blockingItems.AddRangeSafe(items, cancellationToken);
             blockingItems.CompleteAdding();
 
             threads.ForEach(t => t.Join());
 
-            return iterationExceptions;
-        }
-
-        [Obsolete("Async version is harder to maintain")]
-        public static void ForEachAsync<T>(
-            IEnumerable<T> items,
-            Action<T> handleItem,
-            Action<IReadOnlyCollection<Exception>>? completion = null,
-            DegreeOfParallelism? degreeOfParallelism = default,
-            CancellationToken cancellationToken = default)
-        {
-            var threadCount = (degreeOfParallelism ?? DegreeOfParallelism.Default).Value;
-            var completedThreadCount = 0;
-            var blockingItems = new BlockingCollection<T>();
-            var iterationExceptions = new ConcurrentBag<Exception>();
-
-            var threads = Enumerable
-                .Range(0, threadCount)
-                .Select(index => new Thread(() =>
-                {
-                    ForEachThreadLoop(
-                        blockingItems,
-                        handleItem,
-                        iterationExceptions,
-                        cancellationToken);
-
-                    var allThreadsCompleted = Interlocked.Increment(ref completedThreadCount) == threadCount;
-                    if (allThreadsCompleted)
-                    {
-                        var canceled = cancellationToken.IsCancellationRequested || iterationExceptions.Count > 0;
-                        if (canceled)
-                        {
-                            blockingItems.CompleteAdding();
-                        }
-                        else
-                        {
-                            blockingItems.Dispose();
-                            Console.WriteLine($"Thread '{Thread.CurrentThread.Name}' disposed shared blockingCollection");
-                        }
-
-                        completion?.Invoke(iterationExceptions);
-                    }
-                })
-                {
-                    Name = $"{nameof(ParallelExecution)} [{index}]",
-                })
-                .ToList();
-
-            threads.ForEach(t => t.Start());
-
-            var canceled = blockingItems.AddRange(items, cancellationToken);
-            if (canceled)
+            if (cancellationToken.IsCancellationRequested)
             {
-                blockingItems.Dispose();
-                Console.WriteLine($"Thread '{Thread.CurrentThread.Name}' disposed shared blockingCollection");
+                exceptions.Add(new OperationCanceledException(cancellationToken));
             }
-            else
-            {
-                blockingItems.CompleteAdding();
-            }
-            //threads.ForEach(t => t.Join());
+
+            return exceptions;
         }
 
         private static void ForEachThreadLoop<T>(
@@ -117,19 +63,24 @@ namespace GZipTest
 
             while (IsRunning())
             {
-                if (items.TryTake(out var item))
+                if (!items.TryTake(out var item))
                 {
-                    try
-                    {
-                        handleItem(item);
-                    }
-                    catch (Exception ex)
-                    {
-                        exceptions.Add(ex);
-                    }
+                    Thread.Yield();
+                    continue;
                 }
 
-                // Thread.Sleep(0);
+                try
+                {
+                    handleItem(item);
+                }
+                catch (OperationCanceledException)
+                {
+                    // ignore this one as OperationCanceledException will be added at the end of ParallelExecution.ForEach
+                }
+                catch (Exception ex)
+                {
+                    exceptions.Add(ex);
+                }
             }
         }
     }
