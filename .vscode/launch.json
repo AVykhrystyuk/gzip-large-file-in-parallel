@@ -10,7 +10,7 @@
             "request": "launch",
             "preLaunchTask": "build",
             "program": "${workspaceFolder}/GZipTest/bin/Debug/netcoreapp3.1/GZipTest.dll",
-            "args": [],
+            "args": ["decompress", "source-filepath", "destination-filepath"],
             "cwd": "${workspaceFolder}/GZipTest",
             "console": "internalConsole",
             "stopAtEntry": false

@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using GZipTest.DataStructures;
 
-namespace GZipTest
+namespace GZipTest.Core
 {
     public class CollectionDemo
     {

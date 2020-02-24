@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 
-namespace GZipTest
+namespace GZipTest.Core
 {
     public static class CollectionExtensions
     {

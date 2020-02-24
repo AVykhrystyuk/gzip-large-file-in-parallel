@@ -4,7 +4,7 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace GZipTest
+namespace GZipTest.Core
 {
     [Obsolete]
     public static class ParallelTests

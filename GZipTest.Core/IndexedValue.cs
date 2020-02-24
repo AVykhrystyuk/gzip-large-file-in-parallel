@@ -1,6 +1,6 @@
 ﻿using System.Diagnostics;
 
-namespace GZipTest
+namespace GZipTest.Core
 {
     [DebuggerDisplay("Index = {Index} |  Value = {Value}")]
     public class IndexedValue<T>

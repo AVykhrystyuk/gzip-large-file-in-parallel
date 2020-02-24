@@ -3,7 +3,7 @@ using System.Linq;
 using System.Collections.Generic;
 using System.IO;
 
-namespace GZipTest
+namespace GZipTest.Core
 {
     public static class FileUtils
     {

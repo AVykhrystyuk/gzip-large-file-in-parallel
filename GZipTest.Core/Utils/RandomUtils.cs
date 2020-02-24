@@ -1,7 +1,7 @@
 using System;
 using System.Linq;
 
-namespace GZipTest
+namespace GZipTest.Core
 {
     public static class RandomUtils
     {

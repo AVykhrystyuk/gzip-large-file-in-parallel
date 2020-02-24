@@ -4,7 +4,7 @@ using System.Linq;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 
-namespace GZipTest
+namespace GZipTest.Core
 {
     public static class ParallelExecution
     {

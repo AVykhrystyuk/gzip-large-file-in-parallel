@@ -1,4 +1,4 @@
-namespace GZipTest
+namespace GZipTest.Core
 {
     public static class NumberOfBytesIn
     {
