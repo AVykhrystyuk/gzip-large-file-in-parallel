@@ -6,10 +6,9 @@ namespace GZipTest
     {
         public static readonly DegreeOfParallelism Default = new DegreeOfParallelism();
 
-        //
-        // Summary:
-        //     max degree of parallelism
-        //
+        /// <summary>
+        /// Max degree of parallelism
+        /// </summary>
         private const int MAXDOP = 512;
 
         public int Value { get; }

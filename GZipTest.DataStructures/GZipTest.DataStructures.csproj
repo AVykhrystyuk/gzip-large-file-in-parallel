@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>GZipTest.DataStructures</RootNamespace>
+  </PropertyGroup>
+</Project>

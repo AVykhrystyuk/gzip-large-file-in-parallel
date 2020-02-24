@@ -9,7 +9,7 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/GZipTest/bin/Debug/netcoreapp3.0/GZipTest.dll",
+            "program": "${workspaceFolder}/GZipTest/bin/Debug/netcoreapp3.1/GZipTest.dll",
             "args": [],
             "cwd": "${workspaceFolder}/GZipTest",
             "console": "internalConsole",
