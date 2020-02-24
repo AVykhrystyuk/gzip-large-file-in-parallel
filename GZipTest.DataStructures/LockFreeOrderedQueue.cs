@@ -6,6 +6,7 @@ using System.Threading;
 
 namespace GZipTest.DataStructures
 {
+    //TODO: Implement it properly, now it is just for POC
     public class LockFreeOrderedQueue<T> : IOrderedQueue<T>
     {
         private readonly object lockObj = new object();
