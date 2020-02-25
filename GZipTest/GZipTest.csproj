@@ -6,7 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../GZipTest.DataStructures/GZipTest.DataStructures.csproj" />
+    <ProjectReference Include="../GZipTest.Core/GZipTest.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

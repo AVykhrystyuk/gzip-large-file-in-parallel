@@ -1,5 +1,6 @@
 using System;
 using System.Threading;
+using GZipTest.Core;
 
 namespace GZipTest
 {
@@ -28,9 +29,18 @@ namespace GZipTest
 
             try
             {
-                var command = this.commandParser.Parse(args);
-                var validatedCommand = this.commandValidator.Validate(command);
+                var validatedCommand = this.commandValidator.Validate(
+                    this.commandParser.Parse(args));
 
+                var degreeOfParallelism = new DegreeOfParallelism(3); //Environment.ProcessorCount - 2); // MainThread + QueueWorkerThread
+                Console.WriteLine($"The number of processors on this computer is {Environment.ProcessorCount}.");
+                Console.WriteLine($"The number of parallel workers is {degreeOfParallelism.Value}.");
+
+                if (validatedCommand.Compress)
+                {
+                    new GZipEncoder().Encode(validatedCommand.SourceFile, validatedCommand.DestinationFile, degreeOfParallelism, this.cancellationTokenSource.Token);
+                }
+                
                 return 0;
             }
             catch (Exception ex)

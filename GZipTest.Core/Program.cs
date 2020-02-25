@@ -3,16 +3,12 @@ using System.Threading;
 using System.Collections.Generic;
 using System.Linq;
 using GZipTest.DataStructures;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace GZipTest.Core
 {
-    class Program
+    public class ProgramCore
     {
-        //TODO: not used
-        static SemaphoreSlim Semaphore = new SemaphoreSlim(initialCount: 0);
-
-        static void Main(string[] args)
+        public static void Main(string[] args)
         {
             // new CollectionDemo().ApiTest();
 
@@ -47,28 +43,60 @@ namespace GZipTest.Core
             //     .Union(Enumerable.Range(4, 26).OrderByDescending(i => i))
                 .ToList();
 
-            var items = ranges
-                .Select((value, index) =>
-                {
-                    // if (index == 10) cancellationTokenSource.Cancel();
+            var items = ranges;
+                // .Select((value, index) =>
+                // {
+                //     // if (index == 10) cancellationTokenSource.Cancel();
 
-                    // emulate reading from disk
-                    Thread.Sleep(100);
-                    return new IndexedValue<int>(index: value, value: index);
-                });
+                //     // emulate reading from disk
+                //     Thread.Sleep(100);
+                //     return new IndexedValue<int>(index: value, value: index);
+                // });
                 // .OrderByDescending(i => i.Index);
 
             // ParallelTests.TestCustom(items, degreeOfParallelism);
             // Console.WriteLine();
             // ParallelTests.TestTpl(items);
 
-            Run(items, degreeOfParallelism, cancellationTokenSource.Token);
+            MapReduce(
+                items, 
+                mapFn: i => { 
+                    // emulate encoding work
+                    Thread.Sleep(300); //  * (item.Index % 2 == 0 ? 4 : 1));
+                    return i;
+                },
+                reduceFn: i => {
+                    // emulate some work
+                    Thread.Sleep(300);
+                },
+                degreeOfParallelism,
+                cancellationTokenSource.Token);
         }
 
-        static void Run<T>(IEnumerable<IndexedValue<T>> items, DegreeOfParallelism degreeOfParallelism, CancellationToken cancellationToken = default)
+        static void LogEncodingExceptions(IReadOnlyCollection<Exception> exceptions)
         {
-            IOrderedQueue<IndexedValue<T>> orderedQueue =
-                new LockFreeOrderedQueue<IndexedValue<T>>((x, y) => x.Index.CompareTo(y.Index));
+            var errorMessageLines = new List<string>
+            {
+                $"The following {exceptions.Count} exception(s) happened during ParallelEncoding:",
+            };
+            errorMessageLines.AddRange(exceptions.Select(e => e.ToString()));
+            var errorMessage = string.Join(Environment.NewLine, errorMessageLines);
+            Console.WriteLine(errorMessage);
+        }
+
+        public static void MapReduce<T, T2>(
+            IEnumerable<T> items, 
+            Func<T, T2> mapFn,
+            Action<T2> reduceFn,
+            DegreeOfParallelism degreeOfParallelism, 
+            CancellationToken cancellationToken = default)
+        {
+            var indexedItems = items.Select((value, index) => new IndexedValue<T>(index, value));
+
+            var itemEnqueuedSemaphore = new SemaphoreSlim(initialCount: 0);
+
+            IOrderedQueue<IndexedValue<T2>> orderedQueue =
+                new LockFreeOrderedQueue<IndexedValue<T2>>((x, y) => x.Index.CompareTo(y.Index));
 
             var enqueuingCompleted = false;
 
@@ -79,7 +107,7 @@ namespace GZipTest.Core
             {
                 try
                 {
-                    HandleOrderedQueue(orderedQueue, () => enqueuingCompleted, producersLinkedCancellationTokenSource.Token);
+                    HandleOrderedQueue(orderedQueue, reduceFn, () => enqueuingCompleted, itemEnqueuedSemaphore, producersLinkedCancellationTokenSource.Token);
                 }
                 catch (OperationCanceledException)
                 {
@@ -93,18 +121,17 @@ namespace GZipTest.Core
             queueWorker.Start();
 
             var encodingExceptions = ParallelExecution.ForEach(
-                items,
+                indexedItems,
                 handleItem: item =>
                 {
                     // if (item.Index == 27) { throw new Exception("!!!ParallelExecution!!!T_T"); }
                     Console.WriteLine($"{Thread.CurrentThread.Name}: starts working on item {item.Index}");
 
-                    // emulate encoding work
-                    Thread.Sleep(300); //  * (item.Index % 2 == 0 ? 4 : 1));
+                    var newItem = item.Map(mapFn);
 
                     // Console.WriteLine($"{Thread.CurrentThread.Name}: ends working on item {item.Index}");
-                    orderedQueue.Enqueue(item);
-                    Semaphore.Release();
+                    orderedQueue.Enqueue(newItem);
+                    itemEnqueuedSemaphore.Release();
                 },
                 degreeOfParallelism,
                 consumerLinkedCancellationTokenSource.Token);
@@ -124,18 +151,12 @@ namespace GZipTest.Core
             queueWorker.Join();
         }
 
-        static void LogEncodingExceptions(IReadOnlyCollection<Exception> exceptions)
-        {
-            var errorMessageLines = new List<string>
-            {
-                $"The following {exceptions.Count} exception(s) happened during ParallelEncoding:",
-            };
-            errorMessageLines.AddRange(exceptions.Select(e => e.ToString()));
-            var errorMessage = string.Join(Environment.NewLine, errorMessageLines);
-            Console.WriteLine(errorMessage);
-        }
-
-        static void HandleOrderedQueue<T>(IOrderedQueue<IndexedValue<T>> orderedQueue, Func<bool> enqueuingCompleted, CancellationToken cancellationToken = default)
+        static void HandleOrderedQueue<T>(
+            IOrderedQueue<IndexedValue<T>> orderedQueue, 
+            Action<T> action, 
+            Func<bool> enqueuingCompleted,
+            SemaphoreSlim itemEnqueuedSemaphore,
+            CancellationToken cancellationToken = default)
         {
             bool IsRunning()
             {
@@ -149,7 +170,7 @@ namespace GZipTest.Core
                 // if (lookingForIndex == 3) throw new Exception("!!!HandleOrderedQueue!!!");
 
                 // wait for an item being added to the queue
-                Semaphore.Wait(cancellationToken);
+                itemEnqueuedSemaphore.Wait(cancellationToken);
 
                 while (orderedQueue.Count > 0)
                 {
@@ -173,8 +194,7 @@ namespace GZipTest.Core
 
                     Console.WriteLine($"           Writing to FS item {item.Index}");
 
-                    // emulate some work
-                    Thread.Sleep(300);
+                    action(item.Value);
 
                     lookingForIndex++;
                 }

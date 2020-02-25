@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System;
+using System.Diagnostics;
 
 namespace GZipTest.Core
 {
@@ -13,5 +14,9 @@ namespace GZipTest.Core
 
         public int Index { get; }
         public T Value { get; }
+
+        public IndexedValue<TOut> Map<TOut>(Func<T, TOut> mapFn) => new IndexedValue<TOut>(
+            this.Index, 
+            mapFn(this.Value));
     }
 }

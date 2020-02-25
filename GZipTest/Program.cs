@@ -6,8 +6,11 @@ namespace GZipTest
     {
         public static int Main(string[] args)
         {
-            using var application = BuildServiceProvider().GetService<ConsoleApplication>();
-            return application.Run(args);
+            GZipTest.Core.ProgramCore.Main(args);
+            return 0;
+
+            // using var application = BuildServiceProvider().GetService<ConsoleApplication>();
+            // return application.Run(args);
         }
 
         private static ServiceProvider BuildServiceProvider() =>
