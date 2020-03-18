@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GZipTest.DataStructures", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GZipTest.DataStructures.Tests", "GZipTest.DataStructures.Tests\GZipTest.DataStructures.Tests.csproj", "{C79710F5-11C0-4B7C-9DE8-3EB949B7D93E}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GZipTest.Core", "GZipTest.Core\GZipTest.Core.csproj", "{F63C2093-D3B3-4936-BA42-13D3CAAFE035}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -25,5 +27,9 @@ Global
 		{C79710F5-11C0-4B7C-9DE8-3EB949B7D93E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C79710F5-11C0-4B7C-9DE8-3EB949B7D93E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C79710F5-11C0-4B7C-9DE8-3EB949B7D93E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F63C2093-D3B3-4936-BA42-13D3CAAFE035}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F63C2093-D3B3-4936-BA42-13D3CAAFE035}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F63C2093-D3B3-4936-BA42-13D3CAAFE035}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F63C2093-D3B3-4936-BA42-13D3CAAFE035}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

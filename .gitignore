@@ -6,3 +6,5 @@ TestFiles/
 
 # Visual Studio for Mac
 .vs/
+
+.idea/
