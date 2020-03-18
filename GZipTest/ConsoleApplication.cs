@@ -25,7 +25,7 @@ namespace GZipTest
 
         public int Run(string[] args)
         {
-            Console.CancelKeyPress += ConsoleCancelKeyPress;
+            Console.CancelKeyPress += this.ConsoleCancelKeyPress;
 
             try
             {
@@ -40,7 +40,7 @@ namespace GZipTest
                 {
                     new GZipEncoder().Encode(validatedCommand.SourceFile, validatedCommand.DestinationFile, degreeOfParallelism, this.cancellationTokenSource.Token);
                 }
-                
+
                 return 0;
             }
             catch (Exception ex)
@@ -50,7 +50,7 @@ namespace GZipTest
             }
             finally
             {
-                Console.CancelKeyPress -= ConsoleCancelKeyPress;
+                Console.CancelKeyPress -= this.ConsoleCancelKeyPress;
             }
         }
 

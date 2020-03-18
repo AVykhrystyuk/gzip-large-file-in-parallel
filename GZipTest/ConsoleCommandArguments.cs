@@ -4,7 +4,7 @@ namespace GZipTest
 {
     public class ConsoleCommandArguments
     {
-        public bool Compress { get; set;}
+        public bool Compress { get; set; }
         public string SourcePath { get; set; } = string.Empty;
         public string DestinationPath { get; set; } = string.Empty;
     }
