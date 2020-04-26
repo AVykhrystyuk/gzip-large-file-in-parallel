@@ -15,8 +15,17 @@ namespace GZipTest.Core
         public int Index { get; }
         public T Value { get; }
 
-        public IndexedValue<TOut> Map<TOut>(Func<T, TOut> mapFn) => new IndexedValue<TOut>(
-            this.Index, 
-            mapFn(this.Value));
+        public IndexedValue<TOut> Map<TOut>(Func<T, TOut> mapper) => IndexedValue.Create(
+            this.Index,
+            value: mapper(this.Value));
+    }
+
+    public static class IndexedValue
+    {
+        // Allows to omit specifying a generic parameter deriving it from passed value
+        public static IndexedValue<T> Create<T>(int index, T value)
+        {
+            return new IndexedValue<T>(index, value);
+        }
     }
 }

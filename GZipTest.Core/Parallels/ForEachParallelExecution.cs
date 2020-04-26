@@ -1,14 +1,14 @@
 using System;
-using System.Threading;
-using System.Linq;
-using System.Collections.Generic;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
 
-namespace GZipTest.Core
+namespace GZipTest.Core.Parallels
 {
-    public static class ParallelExecution
+    internal static class ForEachParallelExecution
     {
-        public static IReadOnlyCollection<Exception> ForEach<T>(
+        public static ConcurrentBag<Exception> ForEach<T>(
             IEnumerable<T> items,
             Action<T> handleItem,
             DegreeOfParallelism? degreeOfParallelism = default,
@@ -23,6 +23,7 @@ namespace GZipTest.Core
                 .Range(0, threadCount)
                 .Select(index => new Thread(() =>
                 {
+                    // ReSharper disable once AccessToDisposedClosure - we wait for thread completion below
                     ForEachThreadLoop(
                         blockingItems,
                         handleItem,
@@ -30,7 +31,7 @@ namespace GZipTest.Core
                         cancellationToken);
                 })
                 {
-                    Name = $"{nameof(ParallelExecution)} [{index}]",
+                    Name = $"{nameof(ForEachParallelExecution)} [{index}]",
                 })
                 .ToList();
 
@@ -40,11 +41,6 @@ namespace GZipTest.Core
             blockingItems.CompleteAdding();
 
             threads.ForEach(t => t.Join());
-
-            if (cancellationToken.IsCancellationRequested)
-            {
-                exceptions.Add(new OperationCanceledException(cancellationToken));
-            }
 
             return exceptions;
         }
@@ -59,7 +55,7 @@ namespace GZipTest.Core
             {
                 var interrupted = cancellationToken.IsCancellationRequested || exceptions.Count > 0;
                 return !interrupted && !items.IsCompleted;
-            };
+            }
 
             while (IsRunning())
             {
@@ -74,8 +70,9 @@ namespace GZipTest.Core
                     handleItem(item);
                 }
                 catch (OperationCanceledException)
+                    when (cancellationToken.IsCancellationRequested)
                 {
-                    // ignore this one as OperationCanceledException will be added at the end of ParallelExecution.ForEach
+                    // ignore this one
                 }
                 catch (Exception ex)
                 {

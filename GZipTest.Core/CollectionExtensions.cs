@@ -16,10 +16,27 @@ namespace GZipTest.Core
                     return false;
                 }
 
+                // ReSharper disable once MethodSupportsCancellation - that method throws exception and we don't need it here
                 collection.Add(item);
             }
 
             return true;
         }
+
+        public static bool AddRange<T>(this ConcurrentBag<T> collection, IEnumerable<T> items, CancellationToken cancellationToken = default)
+        {
+            foreach (var item in items)
+            {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    return false;
+                }
+
+                collection.Add(item);
+            }
+
+            return true;
+        }
+
     }
 }
