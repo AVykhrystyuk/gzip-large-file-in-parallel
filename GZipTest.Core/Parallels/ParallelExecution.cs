@@ -10,7 +10,7 @@ namespace GZipTest.Core.Parallels
             IEnumerable<T> items,
             Func<T, T2> mapper,
             Action<T2> reducer,
-            DegreeOfParallelism degreeOfParallelism = default,
+            DegreeOfParallelism? degreeOfParallelism = default,
             CancellationToken cancellationToken = default)
         {
             var exceptions = MapReduceParallelExecution.MapReduce(items, mapper, reducer, degreeOfParallelism, cancellationToken);

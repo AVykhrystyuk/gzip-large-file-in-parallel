@@ -48,11 +48,10 @@ namespace GZipTest.Core.Parallels
             IEnumerable<T> items,
             Func<T, T2> mapper,
             Action<T2> reducer,
-            DegreeOfParallelism degreeOfParallelism = default,
+            DegreeOfParallelism? degreeOfParallelism = default,
             CancellationToken cancellationToken = default)
         {
             var indexedItems = items.Select((value, index) => IndexedValue.Create(index, value));
-
             var queueRef = new OrderedQueueRef<IndexedValue<T2>>((x, y) => x.Index.CompareTo(y.Index));
 
             using var consumerCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -71,17 +70,13 @@ namespace GZipTest.Core.Parallels
                 },
                 cancellationToken: producersCancellationTokenSource.Token);
 
+            // TODO: try to run ForEach asynchronously to run QueueWorker on the current thread (saves a thread)
             var forEachExceptions = ForEachParallelExecution.ForEach(
                 indexedItems,
                 handleItem: item =>
                 {
-                    // if (item.Index == 27) { throw new Exception("!!!ParallelExecution!!!T_T"); }
-                    Console.WriteLine($"{Thread.CurrentThread.Name}: starts working on item {item.Index}");
-
-                    var newItem = item.Map(mapper);
-
-                    // Console.WriteLine($"{Thread.CurrentThread.Name}: ends working on item {item.Index}");
-                    queueRef.Enqueue(newItem);
+                    var mappedItem = item.Map(mapper);
+                    queueRef.Enqueue(mappedItem);
                 },
                 degreeOfParallelism,
                 cancellationToken: consumerCancellationTokenSource.Token);
@@ -145,8 +140,6 @@ namespace GZipTest.Core.Parallels
             var lookingForIndex = 0;
             while (IsRunning())
             {
-                // if (lookingForIndex == 3) throw new Exception("!!!HandleOrderedQueue!!!");
-
                 queueRef.WaitForEnqueuedOnce(cancellationToken);
 
                 while (orderedQueue.Count > 0)
@@ -160,20 +153,17 @@ namespace GZipTest.Core.Parallels
 
                     if (pickedItem.Index != lookingForIndex)
                     {
-                        Console.WriteLine(
-                            $"                                                      [wrong-index] Peeked an item with index {pickedItem.Index}, but looking for an item with index {lookingForIndex}");
+                        // Console.WriteLine($"[wrong-index] Peeked an item with index {pickedItem.Index}, but was looking for an item with index {lookingForIndex}");
                         break;
                     }
 
-                    if (!orderedQueue.TryDequeue(out var item))
+                    if (!orderedQueue.TryDequeue(out var dequeuedItem))
                     {
-                        throw new InvalidOperationException(
-                            $"Could not dequeue already peeked item {pickedItem.Index}");
+                        var errorMessage = $"Could not dequeue already peeked item {pickedItem.Index}";
+                        throw new InvalidOperationException(errorMessage);
                     }
 
-                    Console.WriteLine($"           Writing to FS item {item.Index}");
-
-                    action(item.Value);
+                    action(dequeuedItem.Value);
 
                     lookingForIndex++;
                 }

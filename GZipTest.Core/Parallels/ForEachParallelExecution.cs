@@ -37,7 +37,7 @@ namespace GZipTest.Core.Parallels
 
             threads.ForEach(t => t.Start());
 
-            blockingItems.AddRangeSafe(items, cancellationToken);
+            blockingItems.AddRangeUntilCanceled(items, cancellationToken);
             blockingItems.CompleteAdding();
 
             threads.ForEach(t => t.Join());
