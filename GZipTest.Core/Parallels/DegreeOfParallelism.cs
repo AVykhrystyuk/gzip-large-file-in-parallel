@@ -1,6 +1,6 @@
 using System;
 
-namespace GZipTest.Core
+namespace GZipTest.Core.Parallels
 {
     public class DegreeOfParallelism
     {

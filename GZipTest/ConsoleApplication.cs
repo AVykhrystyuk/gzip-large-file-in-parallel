@@ -1,6 +1,7 @@
 using System;
 using System.Threading;
 using GZipTest.Core;
+using GZipTest.Core.Parallels;
 
 namespace GZipTest
 {
