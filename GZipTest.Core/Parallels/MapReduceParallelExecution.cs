@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using GZipTest.DataStructures;
@@ -9,39 +10,82 @@ namespace GZipTest.Core.Parallels
 {
     internal static class MapReduceParallelExecution
     {
-        private class OrderedQueueRef<T>
+        private class BlockingOrderedQueue<T> : IDisposable
         {
             private volatile bool enqueuingCompleted;
 
             private readonly SemaphoreSlim itemEnqueuedSemaphore = new SemaphoreSlim(initialCount: 0);
+            private readonly CancellationTokenSource consumersCancellationTokenSource = new CancellationTokenSource();
 
-            public OrderedQueueRef(Comparison<T> comparison)
+            private readonly IOrderedQueue<T> queue;
+
+            public BlockingOrderedQueue(Comparison<T> comparison, IOrderedQueue<T>? queue = null)
             {
-                this.Queue = new LockFreeOrderedQueue<T>(comparison);
+                this.queue = queue ?? new LockFreeOrderedQueue<T>(comparison); //new POC_PoorlyImplemented_ConcurrentOrderedQueue<T>(comparison);
             }
 
-            public IOrderedQueue<T> Queue { get; }
+            public int Count => this.queue.Count;
 
             public bool EnqueuingCompleted => this.enqueuingCompleted;
 
             public void CompleteEnqueuing()
             {
                 this.enqueuingCompleted = true;
+                this.CancelWaitingConsumers();
             }
 
             /// <summary>
-            ///  Waits for an item being added to the queue using <see cref="Enqueue"/>
+            ///  Waits for an item being added to the queue using <see cref="BlockingOrderedQueue.Enqueue(T)"/>
             /// </summary>
-            public void WaitForEnqueuedOnce(CancellationToken cancellationToken = default)
+            public bool WaitForEnqueuedOnce(CancellationToken cancellationToken = default)
             {
-                this.itemEnqueuedSemaphore.Wait(cancellationToken);
+                var waitNeeded = !this.itemEnqueuedSemaphore.Wait(0);
+                if (waitNeeded)
+                {
+                    // to stop waiting when CompleteEnqueuing() is called
+                    using var combinedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(
+                        cancellationToken,
+                        this.consumersCancellationTokenSource.Token);
+
+                    try
+                    {
+                        this.itemEnqueuedSemaphore.Wait(combinedTokenSource.Token);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // Does not really mater if someone canceled the while operation or if CompleteEnqueuing()
+                        // was called previously. Thus, no need to throw an exception here.
+                        // cancellationToken.ThrowIfCancellationRequested();
+                        return false;
+                    }
+                }
+
+                return true;
             }
+
+            public void AllowToWaitForEnqueuedOnceMore() =>
+                this.itemEnqueuedSemaphore.Release();
 
             public void Enqueue(T item)
             {
-                this.Queue.Enqueue(item);
+                this.queue.Enqueue(item);
                 this.itemEnqueuedSemaphore.Release();
             }
+
+            public bool TryDequeue([MaybeNullWhen(false)] out T item) =>
+                this.queue.TryDequeue(out item);
+
+            public bool TryPeek([MaybeNullWhen(false)] out T item) =>
+                this.queue.TryPeek(out item);
+
+            public void Dispose()
+            {
+                this.itemEnqueuedSemaphore.Dispose();
+                this.consumersCancellationTokenSource.Dispose();
+            }
+
+            private void CancelWaitingConsumers() =>
+                this.consumersCancellationTokenSource.Cancel();
         }
 
         public static ConcurrentBag<Exception> MapReduce<T, T2>(
@@ -52,8 +96,7 @@ namespace GZipTest.Core.Parallels
             CancellationToken cancellationToken = default)
         {
             var indexedItems = items.Select((value, index) => IndexedValue.Create(index, value));
-            var queueRef = new OrderedQueueRef<IndexedValue<T2>>((x, y) => x.Index.CompareTo(y.Index));
-
+            using var orderedQueue = new BlockingOrderedQueue<IndexedValue<T2>>((x, y) => x.Index.CompareTo(y.Index));
             using var consumerCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             using var producersCancellationTokenSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
@@ -61,7 +104,7 @@ namespace GZipTest.Core.Parallels
 
             var queueWorkerThread = RunQueueWorkerThread(
                 reducer,
-                queueRef,
+                orderedQueue,
                 handleException: ex =>
                 {
                     // ReSharper disable once AccessToDisposedClosure - we wait for thread completion below
@@ -70,18 +113,17 @@ namespace GZipTest.Core.Parallels
                 },
                 cancellationToken: producersCancellationTokenSource.Token);
 
-            // TODO: try to run ForEach asynchronously to run QueueWorker on the current thread (saves a thread)
             var forEachExceptions = ForEachParallelExecution.ForEach(
                 indexedItems,
                 handleItem: item =>
                 {
                     var mappedItem = item.Map(mapper);
-                    queueRef.Enqueue(mappedItem);
+                    orderedQueue.Enqueue(mappedItem);
                 },
                 degreeOfParallelism,
                 cancellationToken: consumerCancellationTokenSource.Token);
 
-            queueRef.CompleteEnqueuing();
+            orderedQueue.CompleteEnqueuing();
 
             if (forEachExceptions.Count > 0)
             {
@@ -97,7 +139,7 @@ namespace GZipTest.Core.Parallels
 
         private static Thread RunQueueWorkerThread<T>(
             Action<T> reducer,
-            OrderedQueueRef<IndexedValue<T>> queueRef,
+            BlockingOrderedQueue<IndexedValue<T>> orderedQueue,
             Action<Exception> handleException,
             CancellationToken cancellationToken)
         {
@@ -105,12 +147,12 @@ namespace GZipTest.Core.Parallels
             {
                 try
                 {
-                    HandleOrderedQueue(queueRef, reducer, cancellationToken);
+                    HandleOrderedQueue(orderedQueue, reducer, cancellationToken);
                 }
                 catch (OperationCanceledException)
                     when (cancellationToken.IsCancellationRequested)
                 {
-                    // ignore this one
+                    // ignore this one as it is handled in ParallelExecution facade
                 }
                 catch (Exception ex)
                 {
@@ -122,51 +164,47 @@ namespace GZipTest.Core.Parallels
         }
 
         private static void HandleOrderedQueue<T>(
-            OrderedQueueRef<IndexedValue<T>> queueRef,
+            BlockingOrderedQueue<IndexedValue<T>> orderedQueue,
             Action<T> action,
             CancellationToken cancellationToken = default)
         {
-            var orderedQueue = queueRef.Queue;
-            bool IsRunning()
-            {
-                if (!queueRef.EnqueuingCompleted)
-                {
-                    return true;
-                }
-
-                return orderedQueue.Count > 0;
-            }
-
             var lookingForIndex = 0;
-            while (IsRunning())
+            while (!orderedQueue.EnqueuingCompleted || orderedQueue.Count > 0)
             {
-                queueRef.WaitForEnqueuedOnce(cancellationToken);
+                cancellationToken.ThrowIfCancellationRequested();
 
-                while (orderedQueue.Count > 0)
+                var waitWasSuccessfulOrItemWasAlreadyEnqueued = orderedQueue.WaitForEnqueuedOnce(cancellationToken);
+                if (!waitWasSuccessfulOrItemWasAlreadyEnqueued && orderedQueue.EnqueuingCompleted)
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
-
-                    if (!orderedQueue.TryPeek(out var pickedItem))
-                    {
-                        throw new InvalidOperationException("Could not peek an item");
-                    }
-
-                    if (pickedItem.Index != lookingForIndex)
-                    {
-                        // Console.WriteLine($"[wrong-index] Peeked an item with index {pickedItem.Index}, but was looking for an item with index {lookingForIndex}");
-                        break;
-                    }
-
-                    if (!orderedQueue.TryDequeue(out var dequeuedItem))
-                    {
-                        var errorMessage = $"Could not dequeue already peeked item {pickedItem.Index}";
-                        throw new InvalidOperationException(errorMessage);
-                    }
-
-                    action(dequeuedItem.Value);
-
-                    lookingForIndex++;
+                    // If we got here then CompleteEnqueuing() was called previously.
+                    // Thus, no more item will be enqueued
+                    break;
                 }
+
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (!orderedQueue.TryPeek(out var pickedItem))
+                {
+                    throw new InvalidOperationException("Could not peek an item");
+                }
+
+                if (pickedItem.Index != lookingForIndex)
+                {
+                    // Console.WriteLine($"[wrong-index] Peeked an item with index {pickedItem.Index}, but was looking for an item with index {lookingForIndex}");
+
+                    orderedQueue.AllowToWaitForEnqueuedOnceMore();
+                    continue;
+                }
+
+                if (!orderedQueue.TryDequeue(out var dequeuedItem))
+                {
+                    var errorMessage = $"Could not dequeue already peeked item {pickedItem.Index}";
+                    throw new InvalidOperationException(errorMessage);
+                }
+
+                action(dequeuedItem.Value);
+
+                lookingForIndex++;
             }
         }
     }

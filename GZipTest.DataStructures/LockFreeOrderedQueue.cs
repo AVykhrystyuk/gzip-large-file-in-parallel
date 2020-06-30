@@ -76,6 +76,15 @@ namespace GZipTest.DataStructures
 
             public static bool IsAlive([NotNullWhen(true)] Node? node, [NotNullWhen(true)] out NodeNextRemovedState? state)
             {
+                /*
+                if (node != null) {
+                    state = node.State;
+                    return !state.Removed;
+                }
+                state = null;
+                return false;
+                */
+
                 state = node?.State;
                 return state?.Removed == false;
             }
@@ -318,8 +327,7 @@ namespace GZipTest.DataStructures
         IEnumerator IEnumerable.GetEnumerator() => this.GetEnumerator();
     }
 
-    //TODO: Implement it properly, now it is just for POC
-    public class POC_PoorlyImplemented_LockFreeOrderedQueue<T> : IOrderedQueue<T>
+    public class POC_PoorlyImplemented_ConcurrentOrderedQueue<T> : IOrderedQueue<T>
     {
         private readonly object lockObj = new object();
         private readonly List<T> list = new List<T>();
@@ -338,7 +346,7 @@ namespace GZipTest.DataStructures
             }
         }
 
-        public POC_PoorlyImplemented_LockFreeOrderedQueue(Comparison<T> comparison)
+        public POC_PoorlyImplemented_ConcurrentOrderedQueue(Comparison<T> comparison)
         {
             this.comparison = comparison;
         }
@@ -399,15 +407,18 @@ namespace GZipTest.DataStructures
 
         public bool TryPeek([MaybeNullWhen(false)] out T item)
         {
-            item = default(T)!;
-            if (this.list.Count < 1)
+            lock (this.lockObj)
             {
-                return false;
-            }
+                item = default(T)!;
+                if (this.list.Count < 1)
+                {
+                    return false;
+                }
 
-            item = this.list[0];
-            // this.list.RemoveAt(0);
-            return true;
+                item = this.list[0];
+                // this.list.RemoveAt(0);
+                return true;
+            }
         }
 
         public IEnumerator<T> GetEnumerator()

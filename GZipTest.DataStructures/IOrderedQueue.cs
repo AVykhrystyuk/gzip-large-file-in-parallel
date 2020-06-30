@@ -11,6 +11,6 @@ namespace GZipTest.DataStructures
 
         bool TryDequeue([MaybeNullWhen(false)] out T item);
 
-        bool TryPeek([MaybeNullWhen(false)] out T result);
+        bool TryPeek([MaybeNullWhen(false)] out T item);
     }
 }

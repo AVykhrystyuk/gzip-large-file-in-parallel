@@ -50,6 +50,7 @@ namespace GZipTest.Core
             // Console.WriteLine();
             // ParallelTests.TestTpl(items);
 
+            var counter = 0;
             var exceptions = ParallelExecution.MapReduce(
                 items,
                 mapper: item =>
@@ -58,18 +59,17 @@ namespace GZipTest.Core
                     // if (item == 15) throw new Exception("!!!___ParallelExecution-ERROR___!!!");
                     Console.WriteLine($"{Thread.CurrentThread.Name}: starts working on item {item}");
 
-                    Thread.Sleep(300
-                        // * (item < 2 ? 5 : 1)
-                        * Random.Next(1, 4)
-                    );
+                    Thread.Sleep(600 * Random.Next(1, 4));
                     return item;
                 },
                 reducer: item =>
                 {
                     // if (item == 3) throw new Exception("!!!___ParallelExecution-ERROR___!!!");
                     Console.WriteLine($"           Writing to FS item {item}");
-                    // emulate some work
+                    // emulate IO work
                     Thread.Sleep(300);
+
+                    counter++;
                 },
                 degreeOfParallelism,
                 cancellationTokenSource.Token);
@@ -78,7 +78,8 @@ namespace GZipTest.Core
             {
                 LogEncodingExceptions(exceptions);
             }
-            else
+
+            if (items.Count == counter)
             {
                 Console.WriteLine($"All {items.Count} items are successfully reduced");
             }

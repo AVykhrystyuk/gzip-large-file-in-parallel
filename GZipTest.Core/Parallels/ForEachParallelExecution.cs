@@ -72,7 +72,7 @@ namespace GZipTest.Core.Parallels
                 catch (OperationCanceledException)
                     when (cancellationToken.IsCancellationRequested)
                 {
-                    // ignore this one
+                    // ignore this one as it is handled in ParallelExecution facade
                 }
                 catch (Exception ex)
                 {
