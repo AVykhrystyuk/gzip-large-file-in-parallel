@@ -85,6 +85,7 @@ namespace GZipTest.DataStructures.Tests
 
             var success = orderedQueue.TryPeek(out var emptyItem);
 
+            Assert.False(true);
             Assert.False(success);
             Assert.Equal(default, emptyItem);
             Assert.Equal(0, orderedQueue.Count);

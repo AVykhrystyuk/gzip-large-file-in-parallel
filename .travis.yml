@@ -7,6 +7,6 @@ dotnet: 3.1.301
 install:
   - dotnet restore
 script:
-  - dotnet build
+  - dotnet build -c Release --no-restore
  # https://github.com/microsoft/vstest/issues/2080#issuecomment-539879345
-  - dotnet test --nologo --logger "console;verbosity=normal" < /dev/null
+  - dotnet test -c Release --no-build --no-restore --nologo --logger "console;verbosity=normal" < /dev/null
