@@ -1,0 +1,12 @@
+language: csharp
+solution: GZipTest.sln
+
+mono: none
+dotnet: 3.1.301
+
+install:
+  - dotnet restore
+script:
+  - dotnet build
+ # https://github.com/microsoft/vstest/issues/2080#issuecomment-539879345
+  - dotnet test --nologo --logger "console;verbosity=normal" < /dev/null
